@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+message Packet {
+    string PROCESS_ID = 1;
+    string type = 2;
+    RequestPayload payload = 3;
+}
+
+message RequestPayload {
+    int32 clock = 2;
+}
