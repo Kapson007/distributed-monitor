@@ -44,7 +44,7 @@ class Monitor {
             const parsedMessage = deserialize(message);
 
             switch (parsedMessage.type) {
-                case "Request":{
+                case "REQUEST":{
                     // update lamport clock after receive event
                     this.updateLamportClock(parsedMessage.payload.clock);
 
@@ -69,8 +69,16 @@ class Monitor {
                     // update number of acknowledge messages received
                     this.ackCounter++;
                     if(this.ackCounter === this.NUM_OF_PROCESSES - 1){
-                        await this.enterCriticalSection('GET');
+                        if(parseInt(this.PROCESS_ID) === 3){
+                            await this.enterCriticalSection('PUT');
+                        }else{
+                            await this.enterCriticalSection('GET');
+                        }
                     }
+                    break;
+                }
+                case "UPDATE": {
+                    this.synchronizeBuffer(parsedMessage.updatedBufferValue);
                     break;
                 }
             }
@@ -92,7 +100,7 @@ class Monitor {
 
         const requestMsg = {
             PROCESS_ID: this.PROCESS_ID,
-            type: "Request",
+            type: "REQUEST",
             payload: {
                 clock: this.lamportClock,
             }
@@ -128,23 +136,33 @@ class Monitor {
 
     async enterCriticalSection(action){
         this.usingResource = true;
+        console.log(`Entered critical section at ${this.trackTime()}`);
+
         switch (action) {
             case 'GET':{
-                const randomPosition = Math.floor(Math.random() * this.client.buffer.length);
-                console.log(`Entered critical section at ${this.trackTime()}`);
-                console.log(`Got data from buffer at position: ${randomPosition}. It is: ${this.client.getBuffer(randomPosition)}`);
+                this.getBufferData();
                 await this.releaseSection();
+                break;
+            }
+            case "PUT": {
+                const { position, value } = this.putBufferData();
+                await this.releaseSection({position, value});
+                break;
             }
         }
     }
 
-    async releaseSection(){
+    async releaseSection(updateValuePayload = {}){
         this.usingResource = false;
         this.requestingResource = false;
         this.ackCounter = 0;
 
         this.displayRequestQueue();
         console.log(`Release critical section at ${this.trackTime()}`);
+
+        if(Object.keys(updateValuePayload).length > 0){
+            await this.sendUpdate(updateValuePayload);
+        }
 
         while(this.processQueue.length > 0){
             const processToSend = this.processQueue.shift();
@@ -173,6 +191,48 @@ class Monitor {
     displayRequestQueue(){
         console.log("Request queue: ", this.processQueue);
     }
+
+    getBufferData(){
+        const randomPosition = Math.floor(Math.random() * this.client.buffer.length);
+        console.log(`Got data from buffer at position: ${randomPosition}. It is: ${this.client.getBuffer(randomPosition)}`);
+    }
+
+    putBufferData() {
+        const randomPosition = Math.floor(Math.random() * this.client.buffer.length);
+        const newValue = Math.floor(Math.random() * 100);
+        console.log(`Put data to buffer at position: ${randomPosition}. It is: ${newValue}`);
+        this.client.setBufferValue(randomPosition, newValue);
+         return {
+            position: randomPosition,
+            value: newValue
+        }
+    }
+
+    async sendUpdate(updatePayload) {
+        let broadcastUpdateCount = 1;
+
+        while(broadcastUpdateCount <= this.NUM_OF_PROCESSES){
+            if(broadcastUpdateCount !== parseInt(this.PROCESS_ID)){
+                const updateMsg = {
+                    PROCESS_ID: this.PROCESS_ID,
+                    type: "UPDATE",
+                    payload: {},
+                    updatedBufferValue: updatePayload
+                }
+                const buffer = serializeMessage(updateMsg);
+                console.log("Sending update message.");
+                await this.publisher.send([broadcastUpdateCount,buffer]);
+            }
+            ++broadcastUpdateCount;
+        }
+    }
+
+    synchronizeBuffer(updatedBufferValue) {
+        const { position, value } = updatedBufferValue;
+        this.client.setBufferValue(position, value);
+        console.log(`Buffer after Update`);
+        this.client.displayBuffer();
+    }
 }
 
 (async () => {
@@ -186,4 +246,3 @@ class Monitor {
         }, 3000 * parseInt(process.argv[2]));
     }
 })();
-

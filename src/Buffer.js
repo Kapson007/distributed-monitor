@@ -20,5 +20,9 @@ export class Buffer {
             this.buffer.splice(position, 1, value);
         }
     }
+
+    displayBuffer() {
+        console.log(`Buffer: ${this.buffer}`);
+    }
 }
 
