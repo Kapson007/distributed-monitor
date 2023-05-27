@@ -4,8 +4,14 @@ message Packet {
     string PROCESS_ID = 1;
     string type = 2;
     RequestPayload payload = 3;
+    UpdatedBufferValue updatedBufferValue = 4;
 }
 
 message RequestPayload {
-    int32 clock = 2;
+    int32 clock = 1;
+}
+
+message UpdatedBufferValue{
+    uint32 position = 1;
+    uint32 value = 2;
 }
