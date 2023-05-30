@@ -1,7 +1,7 @@
 import zmq from 'zeromq';
 import deserialize from "./utils/deserialize.js";
-import {Buffer} from "./Buffer.js";
-import serializeMessage from "./utils/serializer.js";
+import { Buffer } from "./Buffer.js";
+import serializeMessage from "./utils/serialize.js";
 
 class Monitor {
     constructor(){
@@ -69,7 +69,7 @@ class Monitor {
                     // update number of acknowledge messages received
                     this.ackCounter++;
                     if(this.ackCounter === this.NUM_OF_PROCESSES - 1){
-                        if(parseInt(this.PROCESS_ID) === 3){
+                        if(parseInt(this.PROCESS_ID) === 2){
                             await this.enterCriticalSection('PUT');
                         }else{
                             await this.enterCriticalSection('GET');
